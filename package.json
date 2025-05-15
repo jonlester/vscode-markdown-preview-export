@@ -1,0 +1,60 @@
+{
+  "name": "markdown-preview-export",
+  "displayName": "markdown-preview-export",
+  "description": "Export the contents of the markdown preview editor as HTML",
+  "version": "0.0.1",
+  "publisher": "jonlester",
+  "repository": "https://github.com/jonlester/vscode-markdown-preview-export",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+	"contributes": {
+		"markdown.markdownItPlugins": true,
+		"commands": [
+			{
+				"command": "markdown.exportPreview",
+				"title": "Export Preview",
+				"category": "Markdown",
+				"icon": "$(export)"
+			},
+			{
+				"command": "markdown.cancelPreviewExport",
+				"title": "Cancel Markdown Preview Export"
+			}
+		],
+		"menus": {
+			"editor/title": [
+				{
+					"command": "markdown.exportPreview",
+					"when": "activeWebviewPanelId == 'markdown.preview' || activeCustomEditorId == 'vscode.markdown.preview.editor'",
+					"group": "navigation"
+				}
+			]
+		}
+	},
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.2",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.100.0",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.25.1",
+    "typescript": "^5.8.3"
+  }
+}
