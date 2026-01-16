@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import type MarkdownIt from 'markdown-it';
-import * as os from 'os';
 import * as path from 'path';
 
 // well-known identifiers used in multiple places
@@ -77,10 +76,34 @@ const markdownHelper = (() => {
 
 			const html = appendThemeClass(bodyFromMetaContent(result.html));
 
-			// Save the html to a file in the user's temp folder
-			const tempDir = os.tmpdir();
-			const outFilePath = path.join(tempDir, 'markdown-preview.html');
-			const outFile = vscode.Uri.file(outFilePath);
+			// Suggest a filename based on the source document
+			// We replace the extension (if present) with .html
+			const docPath = document.uri.path;
+			const lastDot = docPath.lastIndexOf('.');
+			const lastSlash = docPath.lastIndexOf('/');
+			const newPath = (lastDot > lastSlash) 
+				? docPath.substring(0, lastDot) + '.html' 
+				: docPath + '.html';
+			const defaultUri = document.uri.with({ path: newPath });
+
+			// Prompt user for save location
+			const outFile = await vscode.window.showSaveDialog({
+				defaultUri: defaultUri,
+				saveLabel: 'Export HTML',
+				filters: {
+					'HTML': ['html']
+				}
+			});
+
+			if (!outFile) {
+				// User cancelled the dialog
+				return;
+			}
+
+			if (token.isCancellationRequested) {
+				return;
+			}
+
 			const encoder = new TextEncoder();
 			const data = encoder.encode(html);
 			try {
@@ -88,7 +111,8 @@ const markdownHelper = (() => {
 
 				// Show an information message with a clickable link
 				const openLabel = 'Open in Browser';
-				const message = `Markdown preview saved to ${outFile.fsPath}`;
+				const filename = path.basename(outFile.fsPath);
+				const message = `Markdown preview exported to ${filename}`;
 				const selection = await vscode.window.showInformationMessage(
 					message,
 					openLabel
