@@ -5,6 +5,7 @@ Export your Markdown preview from Visual Studio Code exactly as you see it (styl
 ## Features
 
 - **Export Markdown Preview as HTML**: Export the current Markdown preview (not just the raw Markdown) as a styled HTML file (WYSIWYG)
+- **Embed Local Images**: Include local images directly in the exported HTML by default, so the file is easier to share.
 - **Cancel Export**: The logic is non-deterministic since it relies any other extensions or customizations you may have that alter the markdown preview.  There's a potential for problems, so you can cancel the export by clicking the status bar button.
 
 ## Usage
@@ -30,7 +31,7 @@ No additional requirements or dependencies.
 
 ## Extension Settings
 
-This extension does not contribute any settings.
+- `markdownPreviewExport.embedLocalImages`: Embed local images as data URIs in the exported HTML. Remote and existing data URI images are left unchanged. Defaults to `true`.
 
 ## Limitations
 
@@ -48,4 +49,3 @@ The extension hooks into the Markdown preview rendering process, captures the fu
 
 ### 0.0.2
 - Bug fixes for edge cases during installation
-

@@ -9,6 +9,23 @@ const CONTEXT_HAS_PROVIDER = 'markdownPreviewExport.hasProvider';
 const CMD_EXPORT_PREVIEW = 'markdown.exportPreview';
 const CMD_CANCEL_PREVIEW = 'markdown.cancelPreviewExport';
 const STATUS_TEXT_EXPORTING = "$(loading~spin) Exporting preview... $(x) Cancel";
+const CONFIG_SECTION = 'markdownPreviewExport';
+const CONFIG_EMBED_LOCAL_IMAGES = 'embedLocalImages';
+
+const IMAGE_MIME_TYPES: Record<string, string> = {
+	'.apng': 'image/apng',
+	'.avif': 'image/avif',
+	'.bmp': 'image/bmp',
+	'.gif': 'image/gif',
+	'.ico': 'image/x-icon',
+	'.jpeg': 'image/jpeg',
+	'.jpg': 'image/jpeg',
+	'.png': 'image/png',
+	'.svg': 'image/svg+xml',
+	'.tif': 'image/tiff',
+	'.tiff': 'image/tiff',
+	'.webp': 'image/webp',
+};
 
 type PreviewProvider = {
 	isDisposed?: boolean;
@@ -121,10 +138,15 @@ async function renderPreviewDocument(
 	token: vscode.CancellationToken
 ): Promise<string> {
 	const legacyHtml = await tryRenderWithPreviewProvider(document, provider, token);
-	if (legacyHtml !== undefined) {
-		return legacyHtml;
-	}
-	return renderMarkdownDocument(document, token);
+	const html = legacyHtml !== undefined
+		? legacyHtml
+		: await renderMarkdownDocument(document, token);
+	return rewriteImageSources(
+		html,
+		document.uri,
+		getEmbedLocalImagesConfiguration(document.uri),
+		token
+	);
 }
 
 async function tryRenderWithPreviewProvider(
@@ -171,11 +193,14 @@ async function renderMarkdownDocument(
 		throw new Error('VS Code Markdown renderer did not return HTML');
 	}
 
-	const bodyHtml = restoreOriginalImageSources(
-		`<div class="markdown-body" dir="auto">${bodyContent}<div class="code-line" data-line="${document.lineCount}"></div></div>`,
-		document.uri
-	);
+	const bodyHtml = `<div class="markdown-body" dir="auto">${bodyContent}<div class="code-line" data-line="${document.lineCount}"></div></div>`;
 	return buildExportDocument(document.uri, bodyHtml);
+}
+
+function getEmbedLocalImagesConfiguration(resourceUri: vscode.Uri): boolean {
+	return vscode.workspace
+		.getConfiguration(CONFIG_SECTION, resourceUri)
+		.get(CONFIG_EMBED_LOCAL_IMAGES, true);
 }
 
 function buildExportDocument(resourceUri: vscode.Uri, bodyHtml: string): string {
@@ -352,6 +377,54 @@ export function restoreOriginalImageSources(html: string, resourceUri: vscode.Ur
 	});
 }
 
+export async function rewriteImageSources(
+	html: string,
+	resourceUri: vscode.Uri,
+	embedLocalImages: boolean,
+	token?: vscode.CancellationToken
+): Promise<string> {
+	const imageTag = /<img\b[^>]*>/gi;
+	let result = '';
+	let lastIndex = 0;
+	let match: RegExpExecArray | null;
+
+	while ((match = imageTag.exec(html)) !== null) {
+		result += html.slice(lastIndex, match.index);
+		result += await rewriteImageTag(match[0], resourceUri, embedLocalImages, token);
+		lastIndex = imageTag.lastIndex;
+	}
+
+	return result + html.slice(lastIndex);
+}
+
+async function rewriteImageTag(
+	tag: string,
+	resourceUri: vscode.Uri,
+	embedLocalImages: boolean,
+	token?: vscode.CancellationToken
+): Promise<string> {
+	if (token?.isCancellationRequested) {
+		return tag;
+	}
+
+	const source = getHtmlAttribute(tag, 'data-src') ?? getHtmlAttribute(tag, 'src');
+	if (!source) {
+		return tag;
+	}
+
+	if (embedLocalImages) {
+		const localResource = resolveLocalMarkdownResource(source, resourceUri);
+		if (localResource) {
+			const dataUri = await tryReadImageAsDataUri(localResource);
+			if (dataUri) {
+				return setHtmlAttribute(tag, 'src', dataUri);
+			}
+		}
+	}
+
+	return setHtmlAttribute(tag, 'src', resolveMarkdownResource(source, resourceUri));
+}
+
 function getHtmlAttribute(tag: string, name: string): string | undefined {
 	const match = tag.match(
 		new RegExp(`\\s${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s>]+))`, 'i')
@@ -387,6 +460,53 @@ function resolveMarkdownResource(source: string, resourceUri: vscode.Uri): strin
 		return uriToBrowserUrl(vscode.Uri.file(source));
 	}
 	return resolveRelativeBrowserUrl(source, vscode.Uri.joinPath(resourceUri, '..'));
+}
+
+function resolveLocalMarkdownResource(
+	source: string,
+	resourceUri: vscode.Uri
+): vscode.Uri | undefined {
+	if (!source || isExternalUri(source)) {
+		return undefined;
+	}
+	if (/^[a-z]:[\\/]/i.test(source)) {
+		return vscode.Uri.file(stripQueryAndFragment(source));
+	}
+	if (isUriString(source)) {
+		const uri = vscode.Uri.parse(source);
+		return uri.scheme === 'file' ? uri.with({ query: '', fragment: '' }) : undefined;
+	}
+	if (source.startsWith('/')) {
+		const pathWithoutQuery = stripQueryAndFragment(source).replace(/^\/+/, '');
+		const workspaceFolder = vscode.workspace.getWorkspaceFolder(resourceUri);
+		if (workspaceFolder) {
+			return vscode.Uri.joinPath(workspaceFolder.uri, pathWithoutQuery);
+		}
+		return vscode.Uri.file(stripQueryAndFragment(source));
+	}
+	return vscode.Uri.joinPath(
+		vscode.Uri.joinPath(resourceUri, '..'),
+		stripQueryAndFragment(source)
+	);
+}
+
+function stripQueryAndFragment(value: string): string {
+	return value.replace(/[?#].*$/, '');
+}
+
+async function tryReadImageAsDataUri(uri: vscode.Uri): Promise<string | undefined> {
+	try {
+		const data = await vscode.workspace.fs.readFile(uri);
+		const mimeType = getImageMimeType(uri);
+		return `data:${mimeType};base64,${Buffer.from(data).toString('base64')}`;
+	} catch (error) {
+		console.warn(`Unable to embed local markdown image ${uri.toString()}`, error);
+		return undefined;
+	}
+}
+
+function getImageMimeType(uri: vscode.Uri): string {
+	return IMAGE_MIME_TYPES[path.extname(uri.fsPath).toLowerCase()] ?? 'application/octet-stream';
 }
 
 function resolveRelativeBrowserUrl(reference: string, baseDirectory: vscode.Uri): string {
