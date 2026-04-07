@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Markdown Preview Export icon</title>
+  <desc id="desc">A rounded square tile with a geometric M for Markdown and an angled export arrow.</desc>
+
+  <!-- Background tile -->
+  <rect x="24" y="24" width="208" height="208" rx="40" fill="#1F2937"/>
+
+  <!-- Markdown-inspired M -->
+  <path
+    d="M62 82
+       C62 74 68 68 76 68
+       H90
+       C96 68 101 71 104 76
+       L128 118
+       L152 76
+       C155 71 160 68 166 68
+       H180
+       C188 68 194 74 194 82
+       V168
+       C194 176 188 182 180 182
+       H168
+       C160 182 154 176 154 168
+       V120
+       L139 146
+       C136 151 132 154 128 154
+       C124 154 120 151 117 146
+       L102 120
+       V168
+       C102 176 96 182 88 182
+       H76
+       C68 182 62 176 62 168
+       V82Z"
+    fill="white"/>
+
+  <!-- Export arrow (up-right) -->
+  <path
+    d="M146 114
+       C146 107.373 151.373 102 158 102
+       H177.03
+       L154.515 79.485
+       C149.829 74.799 149.829 67.201 154.515 62.515
+       C159.201 57.829 166.799 57.829 171.485 62.515
+       L194 85.03
+       V66
+       C194 59.373 199.373 54 206 54
+       C212.627 54 218 59.373 218 66
+       V114
+       C218 120.627 212.627 126 206 126
+       H158
+       C151.373 126 146 120.627 146 114Z"
+    fill="#60A5FA" />
+</svg>
