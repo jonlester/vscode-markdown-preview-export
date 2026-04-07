@@ -35,7 +35,7 @@
 						"group": "navigation"
 					}
 				]
-		},
+			},
 		"configuration": {
 			"type": "object",
 			"title": "Markdown Preview Export",
@@ -44,6 +44,21 @@
 					"type": "boolean",
 					"default": true,
 					"description": "Embed local images as data URIs in the exported HTML. Remote and existing data URI images are left unchanged."
+				},
+				"markdownPreviewExport.outputMode": {
+					"type": "string",
+					"default": "temp",
+					"description": "Controls where exported Markdown preview HTML files are saved.",
+					"enum": [
+						"temp",
+						"besideMarkdown",
+						"ask"
+					],
+					"enumDescriptions": [
+						"Save to the system temporary folder.",
+						"Save next to the current Markdown file.",
+						"Ask where to save each export."
+					]
 				}
 			}
 		}

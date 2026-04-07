@@ -12,8 +12,8 @@ Export your Markdown preview from Visual Studio Code exactly as you see it (styl
 
 1. Open a Markdown file and preview it (`Ctrl+Shift+V` or `Cmd+Shift+V`).
 2. Click the **Export Preview** button in the preview title bar, or run the `Markdown: Export Preview` command from the Command Palette.
-3. The extension saves the HTML file to your system's temporary folder (e.g., `C:\Users\<user>\AppData\Local\Temp\markdown-preview.html` on Windows).
-4. After export, click **Open in Browser** in the notification to launch in your default system browser.  If you are exporting multiple documents, there's no need to open another window -- just refresh.
+3. By default, the extension saves the HTML file to your system's temporary folder (e.g., `C:\Users\<user>\AppData\Local\Temp\markdown-preview.html` on Windows).
+4. After export, use the notification actions to open the file in your browser, reveal it in your file explorer, or copy the saved file path.
 
 ![A red circled icon in the preview title bar at the top right is highlighted with a tooltip that reads Export Preview, indicating the export action.](/assets/Screenshot.png)
 
@@ -32,11 +32,12 @@ No additional requirements or dependencies.
 ## Extension Settings
 
 - `markdownPreviewExport.embedLocalImages`: Embed local images as data URIs in the exported HTML. Remote and existing data URI images are left unchanged. Defaults to `true`.
+- `markdownPreviewExport.outputMode`: Controls how exported HTML files are saved. Use `temp` for the system temporary folder, `besideMarkdown` to save next to the current Markdown file, or `ask` to choose each export location. Defaults to `temp`.
 
 ## Limitations
 
 - Only exports the current preview. If the preview is not open, the command will not work.
-- The exported HTML is saved to your system's temp directory and will be overwritten on each export.
+- When `markdownPreviewExport.outputMode` is `temp`, the exported HTML is saved to your system's temp directory using the same name and will be overwritten with each export.
 
 ## How it works
 

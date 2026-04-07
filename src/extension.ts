@@ -11,6 +11,14 @@ const CMD_CANCEL_PREVIEW = 'markdown.cancelPreviewExport';
 const STATUS_TEXT_EXPORTING = "$(loading~spin) Exporting preview... $(x) Cancel";
 const CONFIG_SECTION = 'markdownPreviewExport';
 const CONFIG_EMBED_LOCAL_IMAGES = 'embedLocalImages';
+const CONFIG_OUTPUT_MODE = 'outputMode';
+const OUTPUT_MODE_TEMP = 'temp';
+const OUTPUT_MODE_BESIDE_MARKDOWN = 'besideMarkdown';
+const OUTPUT_MODE_ASK = 'ask';
+const DEFAULT_OUTPUT_FILE_NAME = 'markdown-preview.html';
+const OPEN_IN_BROWSER_LABEL = 'Open in Browser';
+const REVEAL_IN_EXPLORER_LABEL = 'Reveal in Explorer';
+const COPY_PATH_LABEL = 'Copy Path';
 
 const IMAGE_MIME_TYPES: Record<string, string> = {
 	'.apng': 'image/apng',
@@ -26,6 +34,11 @@ const IMAGE_MIME_TYPES: Record<string, string> = {
 	'.tiff': 'image/tiff',
 	'.webp': 'image/webp',
 };
+
+type OutputMode =
+	| typeof OUTPUT_MODE_TEMP
+	| typeof OUTPUT_MODE_BESIDE_MARKDOWN
+	| typeof OUTPUT_MODE_ASK;
 
 type PreviewProvider = {
 	isDisposed?: boolean;
@@ -104,26 +117,16 @@ const markdownHelper = (() => {
 				return;
 			}
 
-			// Save the html to a file in the user's temp folder
-			const tempDir = os.tmpdir();
-			const outFilePath = path.join(tempDir, 'markdown-preview.html');
-			const outFile = vscode.Uri.file(outFilePath);
+			const outFile = await getOutputFile(document);
+			if (outFile === undefined || token.isCancellationRequested) {
+				return;
+			}
+
 			const encoder = new TextEncoder();
 			const data = encoder.encode(html);
 			try {
 				await vscode.workspace.fs.writeFile(outFile, data);
-
-				// Show an information message with a clickable link
-				const openLabel = 'Open in Browser';
-				const message = `Markdown preview saved to ${outFile.fsPath}`;
-				const selection = await vscode.window.showInformationMessage(
-					message,
-					openLabel
-				);
-
-				if (selection === openLabel) {
-					await vscode.env.openExternal(outFile);
-				}
+				await showSaveActions(outFile);
 			} catch (error) {
 				console.error('Error writing file:', error);
 				vscode.window.showErrorMessage(`Failed to save markdown preview: ${error}`);
@@ -131,6 +134,92 @@ const markdownHelper = (() => {
 		},
 	};
 })();
+
+async function getOutputFile(document: vscode.TextDocument): Promise<vscode.Uri | undefined> {
+	const outputMode = getOutputModeConfiguration(document.uri);
+	if (outputMode === OUTPUT_MODE_ASK) {
+		return vscode.window.showSaveDialog({
+			defaultUri: getBesideMarkdownOutputUri(document.uri) ?? getTempOutputUri(),
+			filters: {
+				HTML: ['html', 'htm'],
+			},
+			saveLabel: 'Export Preview',
+			title: 'Export Markdown Preview',
+		});
+	}
+	if (outputMode === OUTPUT_MODE_BESIDE_MARKDOWN) {
+		const outputUri = getBesideMarkdownOutputUri(document.uri);
+		if (outputUri) {
+			return outputUri;
+		}
+		void vscode.window.showWarningMessage(
+			'Unable to save beside the current Markdown document. Falling back to the temporary folder.'
+		);
+	}
+	return getTempOutputUri();
+}
+
+function getOutputModeConfiguration(resourceUri: vscode.Uri): OutputMode {
+	const value = vscode.workspace
+		.getConfiguration(CONFIG_SECTION, resourceUri)
+		.get<string>(CONFIG_OUTPUT_MODE, OUTPUT_MODE_TEMP);
+
+	switch (value) {
+		case OUTPUT_MODE_BESIDE_MARKDOWN:
+		case OUTPUT_MODE_ASK:
+		case OUTPUT_MODE_TEMP:
+			return value;
+		default:
+			return OUTPUT_MODE_TEMP;
+	}
+}
+
+function getTempOutputUri(): vscode.Uri {
+	return vscode.Uri.file(path.join(os.tmpdir(), DEFAULT_OUTPUT_FILE_NAME));
+}
+
+export function getBesideMarkdownOutputUri(resourceUri: vscode.Uri): vscode.Uri | undefined {
+	const fileName = getOutputFileName(resourceUri);
+	if (resourceUri.scheme === 'untitled') {
+		return undefined;
+	}
+	if (resourceUri.scheme === 'file') {
+		return vscode.Uri.file(path.join(path.dirname(resourceUri.fsPath), fileName));
+	}
+	return resourceUri.with({
+		fragment: '',
+		path: path.posix.join(path.posix.dirname(resourceUri.path), fileName),
+		query: '',
+	});
+}
+
+function getOutputFileName(resourceUri: vscode.Uri): string {
+	const sourcePath = resourceUri.scheme === 'file' ? resourceUri.fsPath : resourceUri.path;
+	const name = path.basename(sourcePath, path.extname(sourcePath));
+	return `${name || 'markdown-preview'}.html`;
+}
+
+async function showSaveActions(outFile: vscode.Uri): Promise<void> {
+	const message = `Markdown preview saved to ${getDisplayPath(outFile)}`;
+	const selection = await vscode.window.showInformationMessage(
+		message,
+		OPEN_IN_BROWSER_LABEL,
+		REVEAL_IN_EXPLORER_LABEL,
+		COPY_PATH_LABEL
+	);
+
+	if (selection === OPEN_IN_BROWSER_LABEL) {
+		await vscode.env.openExternal(outFile);
+	} else if (selection === REVEAL_IN_EXPLORER_LABEL) {
+		await vscode.commands.executeCommand('revealFileInOS', outFile);
+	} else if (selection === COPY_PATH_LABEL) {
+		await vscode.env.clipboard.writeText(getDisplayPath(outFile));
+	}
+}
+
+function getDisplayPath(uri: vscode.Uri): string {
+	return uri.scheme === 'file' ? uri.fsPath : uri.toString();
+}
 
 async function renderPreviewDocument(
 	document: vscode.TextDocument,
