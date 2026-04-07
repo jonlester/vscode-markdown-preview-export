@@ -6,7 +6,7 @@ Export your Markdown preview from Visual Studio Code exactly as you see it (styl
 
 - **Export Markdown Preview as HTML**: Export the current Markdown preview (not just the raw Markdown) as a styled HTML file (WYSIWYG)
 - **Embed Local Images**: Include local images directly in the exported HTML by default, so the file is easier to share.
-- **Cancel Export**: The logic is non-deterministic since it relies any other extensions or customizations you may have that alter the markdown preview.  There's a potential for problems, so you can cancel the export by clicking the status bar button.
+- **Cancel Export**: The logic is non-deterministic since it relies on other extensions or customizations you may have that alter the markdown preview.  There's a potential for problems, so you can cancel the export by clicking the status bar button.
 
 ## Usage
 
@@ -41,12 +41,18 @@ No additional requirements or dependencies.
 
 ## How it works
 
-The extension hooks into the Markdown preview rendering process, captures the fully rendered HTML (including styles and theme), and writes it to a temporary file. The method used isn't an official VS Code API, so it could break in future releases.
+The extension hooks into the Markdown preview rendering process, captures the fully rendered HTML (including styles and theme), and writes it to a file. It primarily uses VS Code's public `markdown.api.render` API to render the document, with an automatic fallback to a legacy private API for older VS Code builds. Because the fallback path relies on VS Code internals, it could break in future releases.
 
 ## Release Notes
 
-### 0.0.1
-- Initial release: Export Markdown preview as HTML, matching VS Code theme, with quick open in browser.
+### 0.0.3
+- Fixed compatibility with current VS Code by using the public `markdown.api.render` API, with a fallback to the legacy private API for older builds.
+- Added `markdownPreviewExport.embedLocalImages` setting to embed local images as data URIs in exported HTML (enabled by default).
+- Added `markdownPreviewExport.outputMode` setting to control where exported files are saved: system temp folder (`temp`), next to the Markdown file (`besideMarkdown`), or prompted each time (`ask`).
+- Improved post-export notification with actions to open the file in your browser, reveal it in the file explorer, or copy its saved path.
 
 ### 0.0.2
 - Bug fixes for edge cases during installation
+
+### 0.0.1
+- Initial release: Export Markdown preview as HTML, matching VS Code theme, with quick open in browser.
