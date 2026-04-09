@@ -312,6 +312,7 @@ function buildExportDocument(resourceUri: vscode.Uri, bodyHtml: string): string 
 </head>
 <body class="${escapeHtmlAttribute(bodyClasses.join(' '))}">
 	${bodyHtml}
+	${getMarkdownPreviewScriptTags().join('\n\t')}
 </body>
 </html>`;
 }
@@ -384,6 +385,33 @@ function getContributedMarkdownPreviewStyleUris(): vscode.Uri[] {
 		}
 	}
 	return styleUris;
+}
+
+function getContributedMarkdownPreviewScriptUris(): vscode.Uri[] {
+	const scriptUris: vscode.Uri[] = [];
+	for (const extension of vscode.extensions.all) {
+		const contributedScripts = extension.packageJSON?.contributes?.['markdown.previewScripts'];
+		if (!Array.isArray(contributedScripts)) {
+			continue;
+		}
+		for (const script of contributedScripts) {
+			if (typeof script !== 'string') {
+				continue;
+			}
+			try {
+				scriptUris.push(vscode.Uri.joinPath(extension.extensionUri, script));
+			} catch (error) {
+				console.warn(`Unable to resolve markdown preview script ${script}`, error);
+			}
+		}
+	}
+	return scriptUris;
+}
+
+function getMarkdownPreviewScriptTags(): string[] {
+	return getContributedMarkdownPreviewScriptUris().map((scriptUri) => {
+		return `<script src="${escapeHtmlAttribute(uriToBrowserUrl(scriptUri))}"></script>`;
+	});
 }
 
 function resolveMarkdownStyle(style: string, resourceUri: vscode.Uri): string {

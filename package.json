@@ -2,8 +2,7 @@
   "name": "markdown-preview-export",
   "displayName": "markdown-preview-export",
   "description": "Export the contents of the markdown preview editor as HTML",
-  "version": "0.0.3",
-  "icon": "assets/icon.svg"
+  "version": "0.0.4",
   "publisher": "jonlester",
   "repository": "https://github.com/jonlester/vscode-markdown-preview-export",
   "engines": {
