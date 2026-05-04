@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import type MarkdownIt from 'markdown-it';
+import { spawn } from 'child_process';
 import * as os from 'os';
 import * as path from 'path';
 import { pathToFileURL } from 'url';
@@ -39,6 +40,11 @@ type OutputMode =
 	| typeof OUTPUT_MODE_TEMP
 	| typeof OUTPUT_MODE_BESIDE_MARKDOWN
 	| typeof OUTPUT_MODE_ASK;
+
+type WindowsOpenFileCommand = {
+	executable: string;
+	args: string[];
+};
 
 type PreviewProvider = {
 	isDisposed?: boolean;
@@ -126,11 +132,13 @@ const markdownHelper = (() => {
 			const data = encoder.encode(html);
 			try {
 				await vscode.workspace.fs.writeFile(outFile, data);
-				await showSaveActions(outFile);
 			} catch (error) {
 				console.error('Error writing file:', error);
 				vscode.window.showErrorMessage(`Failed to save markdown preview: ${error}`);
+				return;
 			}
+
+			await showSaveActions(outFile);
 		},
 	};
 })();
@@ -208,17 +216,89 @@ async function showSaveActions(outFile: vscode.Uri): Promise<void> {
 		COPY_PATH_LABEL
 	);
 
-	if (selection === OPEN_IN_BROWSER_LABEL) {
-		await vscode.env.openExternal(outFile);
-	} else if (selection === REVEAL_IN_EXPLORER_LABEL) {
-		await vscode.commands.executeCommand('revealFileInOS', outFile);
-	} else if (selection === COPY_PATH_LABEL) {
-		await vscode.env.clipboard.writeText(getDisplayPath(outFile));
+	try {
+		if (selection === OPEN_IN_BROWSER_LABEL) {
+			await openOutputFileInBrowser(outFile);
+		} else if (selection === REVEAL_IN_EXPLORER_LABEL) {
+			await vscode.commands.executeCommand('revealFileInOS', outFile);
+		} else if (selection === COPY_PATH_LABEL) {
+			await vscode.env.clipboard.writeText(getDisplayPath(outFile));
+		}
+	} catch (error) {
+		console.error(`Error running save action "${selection}":`, error);
+		vscode.window.showErrorMessage(`Failed to ${selection?.toLowerCase()}: ${getErrorMessage(error)}`);
 	}
 }
 
 function getDisplayPath(uri: vscode.Uri): string {
 	return uri.scheme === 'file' ? uri.fsPath : uri.toString();
+}
+
+async function openOutputFileInBrowser(outFile: vscode.Uri): Promise<void> {
+	if (process.platform === 'win32' && outFile.scheme === 'file' && !vscode.env.remoteName) {
+		await spawnWindowsOpenCommand(getWindowsOpenFileCommand(outFile.fsPath));
+		return;
+	}
+
+	const opened = await vscode.env.openExternal(outFile);
+	if (!opened) {
+		throw new Error('VS Code reported that the file could not be opened.');
+	}
+}
+
+function spawnWindowsOpenCommand(command: WindowsOpenFileCommand): Promise<void> {
+	const { executable, args } = command;
+	return new Promise((resolve, reject) => {
+		const child = spawn(executable, args, {
+			windowsHide: true,
+		});
+		const outputChunks: Buffer[] = [];
+		let settled = false;
+		const finish = (error?: Error) => {
+			if (settled) {
+				return;
+			}
+			settled = true;
+			error ? reject(error) : resolve();
+		};
+
+		child.stdout?.on('data', (chunk: Buffer) => outputChunks.push(chunk));
+		child.stderr?.on('data', (chunk: Buffer) => outputChunks.push(chunk));
+		child.once('error', finish);
+		child.once('exit', (code, signal) => {
+			if (code === 0) {
+				finish();
+				return;
+			}
+			const reason = signal ? `signal ${signal}` : `exit code ${code ?? 'unknown'}`;
+			const output = Buffer.concat(outputChunks).toString('utf8').trim();
+			const detail = output ? ` ${output}` : '';
+			finish(new Error(`Windows default file opener failed with ${reason}.${detail}`));
+		});
+	});
+}
+
+export function getWindowsOpenFileCommand(filePath: string): WindowsOpenFileCommand {
+	const encodedPath = Buffer.from(filePath, 'utf8').toString('base64');
+	const script = [
+		`$target = [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('${encodedPath}'))`,
+		'Invoke-Item -LiteralPath $target -ErrorAction Stop',
+	].join('; ');
+
+	return {
+		executable: 'powershell.exe',
+		args: [
+			'-NoLogo',
+			'-NoProfile',
+			'-NonInteractive',
+			'-EncodedCommand',
+			Buffer.from(script, 'utf16le').toString('base64'),
+		],
+	};
+}
+
+function getErrorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
 }
 
 async function renderPreviewDocument(

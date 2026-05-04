@@ -6,7 +6,12 @@ import { pathToFileURL } from 'url';
 // You can import and use all API from the 'vscode' module
 // as well as import your extension to test it
 import * as vscode from 'vscode';
-import { getBesideMarkdownOutputUri, restoreOriginalImageSources, rewriteImageSources } from '../extension';
+import {
+	getBesideMarkdownOutputUri,
+	getWindowsOpenFileCommand,
+	restoreOriginalImageSources,
+	rewriteImageSources,
+} from '../extension';
 
 suite('Extension Test Suite', function () {
 	this.timeout(10000);
@@ -133,6 +138,36 @@ suite('Extension Test Suite', function () {
 		} else {
 			assert.strictEqual(outputUri?.fsPath, expected);
 		}
+	});
+
+	test('Builds beside-markdown output URI with unicode file names', () => {
+		const fileName = 'Интеграция по B2B заявкам Провайдер-Дилер';
+		const expected = path.join(os.tmpdir(), 'workspace', 'Провайдеры', `${fileName}.html`);
+		const sourceUri = vscode.Uri.file(
+			path.join(os.tmpdir(), 'workspace', 'Провайдеры', `${fileName}.md`)
+		);
+		const outputUri = getBesideMarkdownOutputUri(sourceUri);
+
+		assert.strictEqual(outputUri?.scheme, 'file');
+		if (process.platform === 'win32') {
+			assert.strictEqual(outputUri?.fsPath.toLowerCase(), expected.toLowerCase());
+		} else {
+			assert.strictEqual(outputUri?.fsPath, expected);
+		}
+	});
+
+	test('Builds Windows shell command with encoded unicode path', () => {
+		const filePath = 'e:\\GoogleDrive\\ISP\\Провайдеры\\Партнёры\\Дом.ру\\B2B\\API-and-LK\\Интеграция по B2B заявкам Провайдер-Дилер.html';
+		const command = getWindowsOpenFileCommand(filePath);
+		const encodedCommandIndex = command.args.indexOf('-EncodedCommand') + 1;
+		const script = Buffer.from(command.args[encodedCommandIndex], 'base64').toString('utf16le');
+
+		assert.strictEqual(command.executable, 'powershell.exe');
+		assert.ok(command.args.includes('-EncodedCommand'));
+		assert.ok(!command.args.some((arg) => arg.includes('Провайдеры')));
+		assert.ok(script.includes('[Convert]::FromBase64String'));
+		assert.ok(script.includes('Invoke-Item -LiteralPath $target -ErrorAction Stop'));
+		assert.ok(!script.includes('Провайдеры'));
 	});
 
 	test('Does not build beside-markdown output URI for untitled documents', () => {

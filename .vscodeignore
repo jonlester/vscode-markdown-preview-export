@@ -1,9 +1,14 @@
 .vscode/**
 .vscode-test/**
 src/**
+out/test/**
 .gitignore
 .yarnrc
+.vscodeignore.tmp
 vsc-extension-quickstart.md
+README.html
+pnpm-lock.yaml
+*.vsix
 **/tsconfig.json
 **/eslint.config.mjs
 **/*.map
