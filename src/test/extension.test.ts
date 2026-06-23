@@ -8,6 +8,7 @@ import { pathToFileURL } from 'url';
 import * as vscode from 'vscode';
 import {
 	getBesideMarkdownOutputUri,
+	getMarkdownPreviewStyleLinks,
 	getWindowsOpenFileCommand,
 	restoreOriginalImageSources,
 	rewriteImageSources,
@@ -123,6 +124,24 @@ suite('Extension Test Suite', function () {
 		assert.strictEqual(typeof html, 'string');
 		assert.ok(html.includes('Exported Preview'));
 		assert.ok(html.includes('<h1'));
+	});
+
+	test('Exports markdown.styles links for print media', () => {
+		const resourceUri = vscode.Uri.file('/workspace/docs/readme.md');
+		const links = getMarkdownPreviewStyleLinks(resourceUri, {
+			scrollBeyondLastLine: false,
+			wordWrap: false,
+			markEditorSelection: false,
+			fontFamily: undefined,
+			fontSize: NaN,
+			lineHeight: NaN,
+			styles: ['https://example.com/preview.css'],
+		});
+		const userStyleLink = links.find((link) => link.includes('class="code-user-style"'));
+
+		assert.ok(userStyleLink);
+		assert.ok(userStyleLink.includes('media="all"'));
+		assert.ok(!userStyleLink.includes('media="screen"'));
 	});
 
 	test('Builds beside-markdown output file URI', () => {
