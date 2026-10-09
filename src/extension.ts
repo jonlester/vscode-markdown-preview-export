@@ -426,7 +426,7 @@ function getMarkdownPreviewStyle(settings: MarkdownPreviewSettings): string {
 	].join(' ');
 }
 
-function getMarkdownPreviewStyleLinks(
+export function getMarkdownPreviewStyleLinks(
 	resourceUri: vscode.Uri,
 	settings: MarkdownPreviewSettings
 ): string[] {
@@ -439,7 +439,7 @@ function getMarkdownPreviewStyleLinks(
 			continue;
 		}
 		links.push(
-			`<link rel="stylesheet" class="code-user-style" data-source="${escapeHtmlAttribute(style)}" href="${escapeHtmlAttribute(resolveMarkdownStyle(style, resourceUri))}" type="text/css" media="screen">`
+			`<link rel="stylesheet" class="code-user-style" data-source="${escapeHtmlAttribute(style)}" href="${escapeHtmlAttribute(resolveMarkdownStyle(style, resourceUri))}" type="text/css" media="all">`
 		);
 	}
 
